@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Production Infrastructure for ChatApp (ECS Fargate + ALB)
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Select at least two Public Subnets
+  DesiredCount:
+    Type: Number
+    Default: 2
+  Cpu:
+    Type: String
+    Default: '512'
+  Memory:
+    Type: String
+    Default: '1024'
+  SecretKey:
+    Type: String
+    NoEcho: true
+    Description: Django Secret Key
+
+Resources:
+  # ECS Cluster
+  ChatAppCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: ChatAppProdCluster
+
+  # CloudWatch Logs
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/chatapp-prod
+      RetentionInDays: 30
+
+  # IAM Roles
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ecs-tasks.amazonaws.com]
+            Action: ['sts:AssumeRole']
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  # Application Load Balancer
+  ChatAppALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: chatapp-alb
+      Subnets: !Ref SubnetIds
+      SecurityGroups: [!Ref ALBSecurityGroup]
+
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP/HTTPS to ALB
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ChatAppTargetGroup
+      LoadBalancerArn: !Ref ChatAppALB
+      Port: 80
+      Protocol: HTTP
+
+  ChatAppTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: chatapp-tg
+      VpcId: !Ref VpcId
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckPath: /api/health/ # Assumes you have a health check endpoint
+      Matcher:
+        HttpCode: '200-399'
+
+  # Task Definition
+  ChatAppTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: chatapp-prod
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      Cpu: !Ref Cpu
+      Memory: !Ref Memory
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: nginx
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/chatapp-nginx:latest"
+          PortMappings:
+            - ContainerPort: 80
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: nginx
+
+        - Name: backend
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/chatapp-backend:latest"
+          Essential: true
+          Environment:
+            - Name: DEBUG
+              Value: 'False'
+            - Name: SECRET_KEY
+              Value: !Ref SecretKey
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: backend
+
+        - Name: realtime
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/chatapp-realtime:latest"
+          Essential: true
+          Environment:
+            - Name: JWT_SECRET
+              Value: !Ref SecretKey
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: realtime
+
+  # ECS Service
+  ChatAppService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref ChatAppCluster
+      TaskDefinition: !Ref ChatAppTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCount
+      LoadBalancers:
+        - ContainerName: nginx
+          ContainerPort: 80
+          TargetGroupArn: !Ref ChatAppTargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: !Ref SubnetIds
+          SecurityGroups:
+            - !Ref ECSServiceSecurityGroup
+
+  ECSServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow traffic from ALB
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+
+Outputs:
+  ALBDNSName:
+    Description: DNS Name of the Load Balancer
+    Value: !GetAtt ChatAppALB.DNSName
