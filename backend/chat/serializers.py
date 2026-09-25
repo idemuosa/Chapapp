@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Message, Profile, Friendship, Post, Comment, Like, Story, Notification
+from .models import Message, Profile, Friendship, Post, Comment, Like, Story, Notification, GroupChat
 from django.contrib.auth.models import User
 
 class UserSerializer(serializers.ModelSerializer):

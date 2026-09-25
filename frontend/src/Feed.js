@@ -63,7 +63,7 @@ function Feed({ token }) {
       await axios.post(`${API_BASE_URL}/api/posts/`, formData, config);
       setNewPost('');
       setImage(null);
-      fetchPosts();
+      fetchData();
     } catch (err) {
       console.error('Error creating post:', err);
     }
@@ -73,7 +73,7 @@ function Feed({ token }) {
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
       await axios.post(`${API_BASE_URL}/api/posts/${postId}/like/`, {}, config);
-      fetchPosts();
+      fetchData();
     } catch (err) {
       console.error('Error liking post:', err);
     }

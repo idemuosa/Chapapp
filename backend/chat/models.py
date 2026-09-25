@@ -28,7 +28,7 @@ class Message(models.Model):
     image = models.ImageField(upload_to='chat_images/', null=True, blank=True)
     voice_note = models.FileField(upload_to='voice_notes/', null=True, blank=True)
     room = models.CharField(max_length=255)
-    group = models.ForeignKey(GroupChat, on_delete=models.CASCADE, related_name='messages', null=True, blank=True)
+    group = models.ForeignKey('GroupChat', on_delete=models.CASCADE, related_name='messages', null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
 
