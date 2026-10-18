@@ -9,7 +9,7 @@ function Register({ onRegisterSuccess, toggleForm }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+    const API_BASE_URL = process.env.REACT_APP_API_URL !== undefined ? process.env.REACT_APP_API_URL : 'http://localhost:8000';
     try {
       await axios.post(`${API_BASE_URL}/api/register/`, {
         username,
