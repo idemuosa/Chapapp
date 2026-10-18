@@ -23,6 +23,9 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/chatapp
       - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${DJANGO_SECRET_KEY:-django-insecure-chatapp-secret-key}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
     depends_on:
       - db
       - redis
@@ -39,12 +42,18 @@ services:
       - redis
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000}
+        - REACT_APP_SOCKET_URL=${REACT_APP_SOCKET_URL:-http://localhost:3001}
     volumes:
       - ./frontend:/app
       - /app/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000}
+      - REACT_APP_SOCKET_URL=${REACT_APP_SOCKET_URL:-http://localhost:3001}
 
   nginx:
     image: nginx:alpine

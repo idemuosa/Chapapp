@@ -11,8 +11,8 @@ import Profile from './Profile';
 import Groups from './Groups';
 import './App.css';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.REACT_APP_API_URL !== undefined ? process.env.REACT_APP_API_URL : 'http://localhost:8000';
+const SOCKET_URL = process.env.REACT_APP_SOCKET_URL !== undefined ? process.env.REACT_APP_SOCKET_URL : 'http://localhost:3001';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
