@@ -8,6 +8,8 @@ function Feed({ token }) {
   const [stories, setStories] = useState([]);
   const [newPost, setNewPost] = useState('');
   const [image, setImage] = useState(null);
+  const [expandedComments, setExpandedComments] = useState({});
+  const [commentInputs, setCommentInputs] = useState({});
 
   const fetchData = async () => {
     try {
@@ -79,6 +81,30 @@ function Feed({ token }) {
     }
   };
 
+  const toggleComments = (postId) => {
+    setExpandedComments(prev => ({
+      ...prev,
+      [postId]: !prev[postId]
+    }));
+  };
+
+  const handleCommentSubmit = async (e, postId) => {
+    e.preventDefault();
+    const commentText = commentInputs[postId];
+    if (!commentText || !commentText.trim()) return;
+
+    try {
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      await axios.post(`${API_BASE_URL}/api/posts/${postId}/comment/`, {
+        content: commentText
+      }, config);
+      setCommentInputs(prev => ({ ...prev, [postId]: '' }));
+      fetchData();
+    } catch (err) {
+      console.error('Error submitting comment:', err);
+    }
+  };
+
   return (
     <div className="feed-container">
       <div className="stories-bar">
@@ -128,10 +154,40 @@ function Feed({ token }) {
             {post.image && <img src={post.image} alt="post" className="post-image" />}
             <div className="post-actions">
               <button onClick={() => handleLike(post.id)}>
-                Like ({post.likes_count})
+                👍 Like ({post.likes_count})
               </button>
-              <span>{post.comments.length} Comments</span>
+              <button onClick={() => toggleComments(post.id)}>
+                💬 {post.comments.length} Comments
+              </button>
             </div>
+
+            {/* Comments Section */}
+            {expandedComments[post.id] && (
+              <div className="comments-section">
+                <div className="comments-list">
+                  {post.comments.length === 0 ? (
+                    <small className="no-comments">No comments yet. Be the first to comment!</small>
+                  ) : (
+                    post.comments.map(c => (
+                      <div key={c.id} className="comment-bubble">
+                        <strong>{c.author.username}</strong>
+                        <p>{c.content}</p>
+                        <small>{new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <form className="comment-form" onSubmit={(e) => handleCommentSubmit(e, post.id)}>
+                  <input
+                    type="text"
+                    placeholder="Write a comment..."
+                    value={commentInputs[post.id] || ''}
+                    onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
+                  />
+                  <button type="submit">Reply</button>
+                </form>
+              </div>
+            )}
           </div>
         ))}
       </div>

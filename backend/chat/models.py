@@ -29,6 +29,7 @@ class Message(models.Model):
     voice_note = models.FileField(upload_to='voice_notes/', null=True, blank=True)
     room = models.CharField(max_length=255)
     group = models.ForeignKey('GroupChat', on_delete=models.CASCADE, related_name='messages', null=True, blank=True)
+    reply_to = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replies')
     timestamp = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
 

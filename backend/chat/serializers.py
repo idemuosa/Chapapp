@@ -44,11 +44,22 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = ['username', 'bio', 'avatar']
 
-class MessageSerializer(serializers.ModelSerializer):
+class MessageReplySerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
     class Meta:
         model = Message
-        fields = ['id', 'sender', 'content', 'image', 'voice_note', 'room', 'timestamp', 'is_read']
+        fields = ['id', 'sender', 'content', 'timestamp']
+
+class MessageSerializer(serializers.ModelSerializer):
+    sender = UserSerializer(read_only=True)
+    reply_to = MessageReplySerializer(read_only=True)
+    reply_to_id = serializers.PrimaryKeyRelatedField(
+        queryset=Message.objects.all(), source='reply_to', write_only=True, required=False, allow_null=True
+    )
+
+    class Meta:
+        model = Message
+        fields = ['id', 'sender', 'content', 'image', 'voice_note', 'room', 'reply_to', 'reply_to_id', 'timestamp', 'is_read']
 
 class CommentSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)

@@ -39,3 +39,23 @@ class ChatAppTests(TestCase):
         data = {'content': 'My first post'}
         response = self.client.post('/api/posts/', data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_reply_message(self):
+        msg1 = Message.objects.create(sender=self.user1, content='First message', room='general')
+        data = {
+            'room': 'general',
+            'content': 'Replying to first message',
+            'reply_to_id': msg1.id
+        }
+        response = self.client.post('/api/messages/', data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNotNone(response.data.get('reply_to'))
+        self.assertEqual(response.data['reply_to']['id'], msg1.id)
+        self.assertEqual(response.data['reply_to']['content'], 'First message')
+
+    def test_create_comment_on_post(self):
+        post_res = self.client.post('/api/posts/', {'content': 'Post to comment on'})
+        post_id = post_res.data['id']
+        comment_res = self.client.post(f'/api/posts/{post_id}/comment/', {'content': 'Great post!'})
+        self.assertEqual(comment_res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(comment_res.data['content'], 'Great post!')
