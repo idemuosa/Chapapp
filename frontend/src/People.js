@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-function People({ token, onCall }) {
+function People({ token, onCall, onlineUsers = [], onStartChat }) {
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [friends, setFriends] = useState([]);
@@ -97,15 +97,31 @@ function People({ token, onCall }) {
       <div className="friends-section">
         <h3>Your Friends</h3>
         {friends.length === 0 && <p>Go find some friends!</p>}
-        {friends.map(friend => (
-          <div key={friend.id} className="user-item">
-            <span>{friend.username}</span>
-            <div className="item-actions">
-              <span className="online-indicator-text">Friend</span>
-              <button className="call-btn-small" onClick={() => onCall(friend.id)}>Call</button>
+        {friends.map(friend => {
+          const isOnline = onlineUsers.includes(friend.id.toString());
+          return (
+            <div key={friend.id} className="user-item">
+              <div className="user-info-with-status">
+                <span className={`status-dot ${isOnline ? 'online' : 'offline'}`} />
+                <span className="username-text">{friend.username}</span>
+                <span className="status-label">{isOnline ? 'Online' : 'Offline'}</span>
+              </div>
+              <div className="item-actions">
+                {onStartChat && (
+                  <button className="chat-btn-small" onClick={() => onStartChat(friend)}>
+                    Message
+                  </button>
+                )}
+                <button className="call-btn-small audio" onClick={() => onCall(friend.id, 'audio')}>
+                  📞 Audio
+                </button>
+                <button className="call-btn-small video" onClick={() => onCall(friend.id, 'video')}>
+                  📹 Video
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

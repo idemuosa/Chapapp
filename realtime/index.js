@@ -88,13 +88,14 @@ async function startServer() {
       });
     });
 
-    // WebRTC Signaling for Video Calls (using userId)
+    // WebRTC Signaling for Video/Audio Calls (using userId)
     socket.on('call-user', (data) => {
-      // data: { to (userId), offer }
+      // data: { to (userId), offer, callType ('video' | 'audio') }
       socket.to(data.to.toString()).emit('call-made', {
         offer: data.offer,
         from: userId,
-        username: socket.user.username
+        username: socket.user.username,
+        callType: data.callType || 'video'
       });
     });
 
@@ -110,6 +111,20 @@ async function startServer() {
       // data: { to (userId), candidate }
       socket.to(data.to.toString()).emit('ice-candidate', {
         candidate: data.candidate,
+        from: userId
+      });
+    });
+
+    socket.on('reject-call', (data) => {
+      // data: { to (userId) }
+      socket.to(data.to.toString()).emit('call-rejected', {
+        from: userId
+      });
+    });
+
+    socket.on('end-call', (data) => {
+      // data: { to (userId) }
+      socket.to(data.to.toString()).emit('call-ended', {
         from: userId
       });
     });
@@ -130,25 +145,38 @@ async function startServer() {
     });
 
     socket.on('send_message', async (data) => {
-      // data: { room, content, group_id }
+      // data: { room, content, group_id, reply_to, reply_to_id }
       try {
-        const messageData = {
+        // PERSISTENCE: Save to Django first or fetch persisted representation
+        let savedMessage = null;
+        try {
+          const res = await axios.post(DJANGO_API_URL, {
+            room: data.room,
+            content: data.content,
+            sender: socket.user.user_id,
+            group: data.group_id || null,
+            reply_to_id: data.reply_to_id || (data.reply_to ? data.reply_to.id : null)
+          }, {
+            headers: {
+              Authorization: socket.handshake.auth.token || socket.handshake.headers['authorization']
+            }
+          });
+          savedMessage = res.data;
+        } catch (postErr) {
+          console.error('Django save message error:', postErr.response ? postErr.response.data : postErr.message);
+        }
+
+        const messageData = savedMessage || {
           ...data,
-          sender_id: socket.user.user_id, // From JWT
-          username: socket.user.username // If available in JWT
+          id: Date.now(),
+          sender: { id: socket.user.user_id, username: socket.user.username || data.sender?.username },
+          sender_id: socket.user.user_id,
+          username: socket.user.username,
+          timestamp: data.timestamp || new Date().toISOString()
         };
 
         // Publish to Redis
         await redisClient.publish('CHAT_MESSAGES', JSON.stringify(messageData));
-
-        // PERSISTENCE: Save to Django
-        await axios.post(DJANGO_API_URL, {
-          room: data.room,
-          content: data.content,
-          sender: socket.user.user_id,
-          group: data.group_id || null
-        });
-
       } catch (err) {
         console.error('Error in message flow:', err.message);
       }
